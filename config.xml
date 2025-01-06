@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+	<name>ikostock</name>
+	<displayName><![CDATA[Ikosoft Stock]]></displayName>
+	<version><![CDATA[0.0.1]]></version>
+	<description><![CDATA[Ikosoft Stock Module for v1.7]]></description>
+	<author><![CDATA[Ikosoft]]></author>
+	<tab><![CDATA[quick_bulk_update]]></tab>
+	<is_configurable>1</is_configurable>
+	<need_instance>1</need_instance>
+</module>

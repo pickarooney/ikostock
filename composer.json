@@ -1,0 +1,13 @@
+{
+    "name": "ikosoft/ikostock",
+    "description": "Ikosoft stock management",
+    "type": "prestashop-module",
+    "require": {
+        "php": ">=7.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ikosoft\\Ikostock\\": "src/"
+        }
+    }
+}
