@@ -26,7 +26,6 @@
 
 require_once( __DIR__ .'/ikosoftInterface.php');
 require_once( __DIR__ .'/prestaShopInterface.php');
-//require_once dirname(__FILE__) . '/syncHandler.php';
 
 if (!defined('_PS_VERSION_')) {
     exit;
@@ -42,6 +41,7 @@ class Ikostock extends Module
 	private $prestaShopInterface;
 	private $ikosoftInterface;
 	private $masterStock;
+	private $techStock;
 
     public function __construct()
     {
@@ -55,6 +55,7 @@ class Ikostock extends Module
 		$this->logger = new FileLogger(0); 
 		$this->logger->setFilename(_PS_ROOT_DIR_.'/var/logs/Ikostock_debug.log');
 		$this->masterStock = Configuration::get('IKOSTOCK_MASTER_STOCK_SETTING');
+		$this->techStock = Configuration::get('IKOSTOCK_TECH_STOCK_SETTING');
 
 		$this->prestaShopInterface = new PrestaShopInterface();
 		$this->ikosoftInterface = new IkosoftInterface();
@@ -89,7 +90,6 @@ class Ikostock extends Module
         include(dirname(__FILE__).'/sql/install.php');
 		
         return parent::install() &&
-			$this->installTab() &&  //experimental 1
             $this->registerHook('header') &&
             $this->registerHook('displayBackOfficeHeader') &&
             $this->registerHook('actionObjectCustomerUpdateAfter') &&
@@ -106,35 +106,6 @@ class Ikostock extends Module
         return parent::uninstall() && $this->uninstallTab();
     }
 
-	//EXPERIMENTAL 1++
-    
-	private function installTab()
-    {
-        $tab = new Tab();
-        $tab->class_name = 'AdminYourCustomController';
-        $tab->module = $this->name;
-        $tab->id_parent = (int) Tab::getIdFromClassName('AdminCatalog'); // Default tab, or use AdminCatalog
-        $tab->active = 1;
-
-        foreach (Language::getLanguages(true) as $lang) {
-            $tab->name[$lang['id_lang']] = 'Custom Controller';
-        }
-
-        return $tab->add();
-    }
-
-    private function uninstallTab()
-    {
-        $id_tab = (int) Tab::getIdFromClassName('AdminYourCustomController');
-        if ($id_tab) {
-            $tab = new Tab($id_tab);
-            return $tab->delete();
-        }
-        return true;
-    }
-
-	//EXPERIMENTAL 1--  
-	
 
     /**
      * Load the configuration form
@@ -264,6 +235,25 @@ class Ikostock extends Module
                             )
                         ),
                     ),
+					array(
+                        'type' => 'switch',
+                        'label' => $this->l('Sync tech products'),
+                        'name' => 'IKOSTOCK_TECH_STOCK_SETTING',
+                        'is_bool' => true,
+                        'desc' => $this->l('Synchronise technical products?'),
+                        'values' => array(
+                            array(
+                                'id' => 'sync_tech_on',
+                                'value' => true,
+                                'label' => $this->l('On')
+                            ),
+                            array(
+                                'id' => 'sync_tech_off',
+                                'value' => false,
+                                'label' => $this->l('Off')
+                            )
+                        ),
+                    ),
                     array(
                         'type' => 'switch',
                         'label' => $this->l('Schedule sync'),
@@ -314,6 +304,7 @@ class Ikostock extends Module
             'IKOSTOCK_ACCOUNT_EMAIL' => Configuration::get('IKOSTOCK_ACCOUNT_EMAIL', 'contact@prestashop.com'),
             'IKOSTOCK_ACCOUNT_PASSWORD' => Configuration::get('IKOSTOCK_ACCOUNT_PASSWORD', null),
 			'IKOSTOCK_MASTER_STOCK_SETTING' => Configuration::get('IKOSTOCK_MASTER_STOCK_SETTING', null),
+			'IKOSTOCK_TECH_STOCK_SETTING' => Configuration::get('IKOSTOCK_TECH_STOCK_SETTING', false),
 			'IKOSTOCK_SCHEDULE_SYNC_SETTING' => Configuration::get('IKOSTOCK_SCHEDULE_SYNC_SETTING', true),
 			'IKOSTOCK_DATABASE_NUMBER' => Configuration::get('IKOSTOCK_DATABASE_NUMBER', null),
 			'IKOSTOCK_API_KEY' => Configuration::get('IKOSTOCK_API_KEY', null),
@@ -364,7 +355,10 @@ class Ikostock extends Module
 
 	public function getIkosoftProducts()
 	{
-		$items = $this->ikosoftInterface->getProducts();
+		if ($this->techStock === '1')
+			$items = $this->ikosoftInterface->getProducts(true);
+		else
+			$items = $this->ikosoftInterface->getProducts(false);
 		
 		if ($items == null) return null;
 		
@@ -634,20 +628,6 @@ class Ikostock extends Module
         $this->context->controller->addJS($this->_path.'/views/js/front.js');
         $this->context->controller->addCSS($this->_path.'/views/css/front.css');
     }
-
-    public function hookActionObjectCustomerUpdateAfter($params) //added to random hook to test and avoid recursion
-    {
-		
-		if($this->masterStock == 'PrestaShop')
-			$this->synchroniseProductQuantitiesFromPrestaShop(true);
-		else
-			$this->synchroniseProductQuantitiesFromIkosoft();
-
-		//synchronisePrices to be decided (use flag to decide direction?)
-		//cron job this ?
-
-    }
-	
 	
 	public function hookActionValidateOrder($params) 
 	{
@@ -699,9 +679,6 @@ class Ikostock extends Module
 		
 	}
 
-
-	//TEST HOOK area++
-    
 	public function hookDisplayDashboardToolbarTopMenu($params)
 	{
 		
@@ -718,12 +695,23 @@ class Ikostock extends Module
 				'base_url' => $baseUrl,
 			]);
 
-			//return $this->display(__FILE__, 'views/templates/hook/dropdown.tpl');
+
 			return $this->fetch('module:ikostock/views/templates/hook/dropdown.tpl');
 			
 		}
 	}
 	
+	//TEST HOOK area++
+	
+    public function cronProcess()
+    {
+        if($this->masterStock == 'PrestaShop')
+			$this->synchroniseProductQuantitiesFromPrestaShop(true);
+		else
+			$this->synchroniseProductQuantitiesFromIkosoft();
+        
+		$this->logger->logDebug("Cron job completed.");
+    }
 
 
 	//TEST HOOK area--

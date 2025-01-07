@@ -328,6 +328,8 @@ class PrestaShopInterface
 		{
 			$id_product = Product::getIdByEan13($prod->barcode);
 			StockAvailable::setQuantity($id_product,0, $prod->quantity, $id_shop = null, $add_movement = true);
+			
+			$this->logger->logDebug('[PRESTASHOP] Updated '.$prod->name.' with quantity '.$prod->quantity);
 		}
 	
 	}

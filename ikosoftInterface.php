@@ -122,10 +122,7 @@ class IkosoftInterface
     public function createStockMovementDetail($id_product,$quantity,$purchase_price)  
 	{
 		$command = "insert into [ProduitMvtDetail] ([idproduit],[IdProduitMvt],[quantite],[GuidCS],[iguid],[PrixAchat]) select ".$id_product.",max(pm.id),".$quantity.",newid(),newid(),".$purchase_price." from [ProduitMouvement] pm;";
-		
-		$this->logger->logDebug('command for movement detail');
-		$this->logger->logDebug($command);
-		
+			
 		$response = $this->callExternalApi($command);
 	
 		if ($response == null) return false;
@@ -281,13 +278,14 @@ class IkosoftInterface
 		}
 	}
 	
-	public function getProducts() 
+	public function getProducts($includeTechnicalProducts) 
 	{
 		
 		$command = "select p.[CodeABarre] as ean13, p.[Reel] as quantity, p.[Vente]/100 as price, p.[PrixCatalogue]/100 as wholesale_price, p.[DateHeure] as date_upd,
-					p.[Referen] as name, f.[NomFournisseur] as manufacturer_name, s.[Taux]/100 as rate, pf.[NomFamille] as category from [Produit] p inner join [SysTauxTva] s on s.[Id] = p.[IdTauxTVA] inner join [ProduitFournisseur] f on f.[id] = p.[IdProduitFournisseur] inner join [ProduitFamille] pf on pf.[Id] = p.[IdProduitfamille] where p.[IdProduitType] in (1,3) and p.[CodeABarre] not like ''";
-		
-		//$command = $command."and p.[CodeABarre] = '4025087079080';"; //test for one product
+					p.[Referen] as name, f.[NomFournisseur] as manufacturer_name, s.[Taux]/100 as rate, pf.[NomFamille] as category from [Produit] p inner join [SysTauxTva] s on s.[Id] = p.[IdTauxTVA] inner join [ProduitFournisseur] f on f.[id] = p.[IdProduitFournisseur] inner join [ProduitFamille] pf on pf.[Id] = p.[IdProduitfamille] where p.[CodeABarre] not like ''";
+						
+		if (!$includeTechnicalProducts)
+					$command=$command.' and p.[IdProduitType] in (1,3)';
 
 		$response = $this->callExternalApi($command);
 		
@@ -310,6 +308,7 @@ class IkosoftInterface
 	{
 		$operator = '>';
 		if ($lower) $operator = '<';
+		$command='';
 
 		foreach ($products as $prod)
 		{
@@ -406,7 +405,7 @@ class IkosoftInterface
 			if ($lower != null)
 			{
 				$this->logger->logDebug('[IKOSOFT] Creating stock in.');	
-				$this->createStockMovement('AUTOSYNCHRO',1);
+				$this->createStockMovement('AUTOSYNCHRO '.date("H:i:s"),1);
 				foreach ($lower as $prod)
 				{
 					$added = $this->createStockMovementDetail($prod[0],$prod[1],$prod[2]);
@@ -419,12 +418,12 @@ class IkosoftInterface
 			if ($higher != null)
 			{
 				$this->logger->logDebug('[IKOSOFT] Creating stock out.');	
-				$this->createStockMovement(date("H:i:s"),1);
+				$this->createStockMovement('AUTOSYNCHRO '.date("H:i:s"),1);
 				foreach ($higher as $prod)
 				{
 					$added = $this->createStockMovementDetail($prod[0],$prod[1],$prod[2]);
 					if ($added) 
-						$this->logger->logDebug('[IKOSOFT] Added product to stock out: '.$$prod[3]);
+						$this->logger->logDebug('[IKOSOFT] Added product to stock out: '.$prod[3]);
 					$this->reduceStockAmount($prod[0],$prod[1]);
 				}
 			}
